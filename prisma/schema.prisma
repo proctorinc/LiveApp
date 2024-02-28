@@ -1,0 +1,70 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id              String                @id @default(uuid())
+  name            String                @unique
+  color           String
+  email           String                @unique
+  ownedRooms      Room[]
+  joinedRooms     UsersJoinedRoom[]
+  authorizedRooms UsersAuthorizedRoom[]
+  messages        Message[]
+  createdAt       DateTime              @default(now())
+  enabled         Boolean               @default(false)
+}
+
+model UsersJoinedRoom {
+  user           User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId         String
+  room           Room     @relation(fields: [roomId], references: [id], onDelete: Cascade)
+  roomId         String
+  isActive       Boolean  @default(true)
+  lastJoinedDate DateTime @default(now())
+
+  @@id([userId, roomId])
+}
+
+model UsersAuthorizedRoom {
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId      String
+  room        Room     @relation(fields: [roomId], references: [id], onDelete: Cascade)
+  roomId      String
+  invitedDate DateTime @default(now())
+
+  @@id([userId, roomId])
+}
+
+model Room {
+  id              String                @id @default(uuid())
+  name            String?
+  shareId         String                @unique
+  owner           User                  @relation(fields: [ownerId], references: [id])
+  ownerId         String
+  messages        Message[]
+  joinList        UsersJoinedRoom[]
+  createdAt       DateTime
+  isPublic        Boolean               @default(true)
+  authorizedUsers UsersAuthorizedRoom[]
+
+  @@unique([ownerId, name])
+}
+
+model Message {
+  id       String   @id @default(uuid())
+  text     String
+  sender   User?    @relation(fields: [senderId], references: [id])
+  senderId String?
+  sentAt   DateTime @default(now())
+  room     Room     @relation(fields: [roomId], references: [id], onDelete: Cascade)
+  roomId   String
+}

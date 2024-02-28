@@ -1,8 +1,8 @@
 import { FC, ReactNode, createContext } from "react";
 import { useEffect, useState } from "react";
-import { Message, Room, User } from "../types";
+import { Room, RoomWithActiveUsers } from "@/types";
 import { useNavigate } from "react-router-dom";
-import useSocket from "../hooks/useSocket";
+import useSocket from "@/features/socket/hooks/useSocket";
 
 type RoomError = {
   message: string;
@@ -12,32 +12,26 @@ type RoomProviderProps = {
   children: ReactNode;
 };
 type RoomContext = {
+  isRoomLoaded: boolean;
   leaveRoom: () => void;
   loadRoom: (roomId: string) => void;
-  refreshRoom: (roomId: string) => void;
   sendMessage: (messageText: string) => void;
-  roomId: string | null;
-  messages: Message[];
-  users: User[];
-  isRoomLoaded: boolean;
+  alertQueue: string[];
+  room: RoomWithActiveUsers | null;
 };
 const RoomContext = createContext<RoomContext | null>(null);
 
 export const RoomContextProvider: FC<RoomProviderProps> = ({ children }) => {
   const socket = useSocket();
   const navigate = useNavigate();
-  // const [room, setRoom] = useState<Room | null>(null);
-  const [roomId, setRoomId] = useState<string | null>(null);
-  const [messages, setMessages] = useState<Message[]>([]);
-  const [users, setUsers] = useState<User[]>([]);
+  const [room, setRoom] = useState<Room | null>(null);
+  const [alertQueue, setAlertQueue] = useState<string[]>([]);
 
-  // function refreshRoom(roomId: string | undefined) {
-  //   if (roomId) {
-  //     setRoomId(roomId);
-  //   }
-  //   console.log("Refreshing room", roomId);
-  //   socket.emit("refresh-room", roomId);
-  // }
+  const activeUsers = room?.joinList
+    ? room?.joinList
+        .filter((joinedUser) => joinedUser.isActive)
+        .map((joinedUser) => joinedUser.user)
+    : [];
 
   function sendMessage(messageText: string) {
     if (messageText.length > 0) {
@@ -53,23 +47,23 @@ export const RoomContextProvider: FC<RoomProviderProps> = ({ children }) => {
   }
 
   function leaveRoom() {
-    setRoomId(null);
-    setUsers([]);
+    if (room) {
+      socket.emit("room:leave", room?.id);
+      setRoom(null);
+    }
     navigate("/");
-    socket.emit("room:leave", roomId);
   }
 
   useEffect(() => {
-    function onNewMessage(value: Message) {
-      console.log("Received new message!");
-      setMessages((prev) => [value, ...prev]);
-    }
+    // Show user has joined for 3 seconds
+    setTimeout(() => {
+      setAlertQueue((prev) => prev.slice(1));
+    }, 3000);
+  }, [alertQueue]);
 
-    function onRoomData(room: Room) {
-      console.log("Joined room id:", room.id);
-      setRoomId(room.shareId);
-      setMessages(room.messages);
-      setUsers(room.joinList);
+  useEffect(() => {
+    function onRoomData(updatedRoom: Room) {
+      setRoom(updatedRoom);
     }
 
     function onRoomError(error: RoomError) {
@@ -77,24 +71,29 @@ export const RoomContextProvider: FC<RoomProviderProps> = ({ children }) => {
       navigate("/");
     }
 
+    function onAlert(alert: string) {
+      console.log(alert);
+      setAlertQueue((prev) => [...prev, alert]);
+    }
+
     socket.on("room:error", onRoomError);
     socket.on("room:data", onRoomData);
-    socket.on("room:new-message", onNewMessage);
+    socket.on("room:alert", onAlert);
 
     return () => {
       socket.off("room:error", onRoomError);
       socket.off("room:data", onRoomData);
-      socket.off("room:new-message", onNewMessage);
+      socket.off("room:alert", onAlert);
     };
   }, [socket, navigate]);
 
   const contextData = {
-    isRoomLoaded: roomId !== null,
+    isRoomLoaded: room !== null,
     leaveRoom,
     loadRoom,
     sendMessage,
-    messages,
-    users,
+    alertQueue,
+    room: room ? { ...room, activeUsers } : null,
   };
 
   return (

@@ -1,4 +1,4 @@
-export function formatTimeSince(date: string): string {
+export function formatTimeSince(date: Date): string {
   const since = getTimeSince(date);
 
   if (since.days > 0) {
@@ -12,7 +12,7 @@ export function formatTimeSince(date: string): string {
   }
 }
 
-export function getTimeSince(date: string) {
+export function getTimeSince(date: Date) {
   const now = Date.now();
   // Time Difference in Milliseconds
   const diffMs: number = new Date(date).getTime() - now;
@@ -37,3 +37,19 @@ export function getTimeSince(date: string) {
     days: totalDays,
   };
 }
+
+export function shortenUsername(username: string) {
+  return username.substring(0, 2).toUpperCase();
+}
+
+export const copyToClipboard = (text: string) => {
+  navigator.clipboard.writeText(text);
+};
+
+export const formatDate = (date: Date) => {
+  return new Date(date).toLocaleString("en-US", {
+    month: "long",
+    day: "numeric",
+    year: "numeric",
+  });
+};

@@ -6,18 +6,19 @@ import { User } from "@prisma/client";
 const router = Router();
 
 router.get(
-  "/join/:roomId",
+  "/join/:shareId",
   async (req: Request, res: Response, next: NextFunction) => {
     try {
-      const roomId = req.params.roomId;
+      const shareId = req.params.shareId;
       const io: Server = req.app.get("io");
 
-      const room = await RoomService.joinRoomByShareId(roomId);
+      const room = await RoomService.joinRoomByShareId(shareId);
 
-      // if (room) {
-      //   io.to(roomId).emit("room:joined", user);
-      // }
-      res.json(room);
+      if (room) {
+        res.json(room);
+      } else {
+        res.status(400).json({ message: "Invalid Room ID" });
+      }
     } catch (error) {
       console.error(error);
       next(error);
@@ -40,6 +41,22 @@ router.get(
     }
   }
 );
+
+// router.get(
+//   "/recent",
+//   async (req: Request, res: Response, next: NextFunction) => {
+//     try {
+//       const user = req.session.user as User;
+//       const roomId = req.params.roomId;
+
+//       const room = await RoomService.getRecentlyJoinedRooms(user, roomId);
+//       res.json(room);
+//     } catch (error) {
+//       console.error(error);
+//       next(error);
+//     }
+//   }
+// );
 
 router.get("/", async (req: Request, res: Response, next: NextFunction) => {
   try {
@@ -68,10 +85,13 @@ router.patch(
   async (req: Request, res: Response, next: NextFunction) => {
     try {
       const user = req.session.user as User;
-      const roomId = req.params.room;
-      const { name } = req.body;
+      const roomId = req.params.roomId;
+      const { name, isPublic } = req.body;
+      console.log(req.body);
 
-      return RoomService.updateRoom(user, roomId, name);
+      const room = await RoomService.updateRoom(user, roomId, name, isPublic);
+
+      res.json(room);
     } catch (error) {
       next(error);
     }
@@ -79,13 +99,15 @@ router.patch(
 );
 
 router.patch(
-  "/:roomId/share-id",
+  "/:roomId/refresh/share-id",
   async (req: Request, res: Response, next: NextFunction) => {
     try {
       const user = req.session.user as User;
       const roomId = req.params.roomId;
 
-      return RoomService.updateRoomShareId(user, roomId);
+      const shareId = await RoomService.updateRoomShareId(user, roomId);
+
+      res.json(shareId);
     } catch (error) {
       next(error);
     }
@@ -98,7 +120,7 @@ router.delete(
     try {
       const user = req.session.user as User;
       const roomId = req.params.roomId;
-      return RoomService.deleteRoom(user, roomId);
+      return await RoomService.deleteRoom(user, roomId);
     } catch (error) {
       next(error);
     }

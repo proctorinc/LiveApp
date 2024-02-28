@@ -1,10 +1,14 @@
+import { User } from "@prisma/client";
 import { generateRoomId } from "../../utils";
-import { User } from "../room/models";
 
 function login(username: string, password: string): User {
   return {
-    id: generateRoomId(),
-    name: username,
+    id: "test-id",
+    name: "MattyP",
+    color: "purple",
+    email: "proctormatt0@gmail.com",
+    createdAt: new Date(),
+    enabled: true,
   };
 }
 

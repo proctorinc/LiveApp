@@ -2,11 +2,11 @@ import { generateRoomId } from "../../utils";
 import { db } from "../../db";
 import { User } from "@prisma/client";
 
-async function getRoomByShareId(user: User, roomId: string) {
+async function getRoomByShareId(user: User, shareId: string) {
   return await db.room.findUniqueOrThrow({
     where: {
       ownerId: user.id,
-      shareId: roomId,
+      shareId,
     },
     include: {
       joinList: {
@@ -23,14 +23,20 @@ async function getRoomByShareId(user: User, roomId: string) {
         },
       },
       owner: true,
+      authorizedUsers: {
+        include: {
+          user: true,
+        },
+      },
     },
   });
 }
 
-async function joinRoomByShareId(roomId: string) {
-  const room = await db.room.findUniqueOrThrow({
+async function getRoomById(user: User, roomId: string) {
+  return await db.room.findUniqueOrThrow({
     where: {
-      shareId: roomId,
+      ownerId: user.id,
+      id: roomId,
     },
     include: {
       joinList: {
@@ -47,6 +53,40 @@ async function joinRoomByShareId(roomId: string) {
         },
       },
       owner: true,
+      authorizedUsers: {
+        include: {
+          user: true,
+        },
+      },
+    },
+  });
+}
+
+async function joinRoomByShareId(shareId: string) {
+  const room = await db.room.findUniqueOrThrow({
+    where: {
+      shareId,
+    },
+    include: {
+      joinList: {
+        include: {
+          user: true,
+        },
+      },
+      messages: {
+        include: {
+          sender: true,
+        },
+        orderBy: {
+          sentAt: "desc",
+        },
+      },
+      owner: true,
+      authorizedUsers: {
+        include: {
+          user: true,
+        },
+      },
     },
   });
 
@@ -65,44 +105,115 @@ async function getRoomsByUser(user: User) {
         },
       },
       messages: true,
+      authorizedUsers: {
+        include: {
+          user: true,
+        },
+      },
+    },
+    orderBy: {
+      createdAt: "asc",
+    },
+  });
+}
+
+async function getActiveUsersInRoom(roomId: string) {
+  return await db.usersJoinedRoom.findMany({
+    where: {
+      roomId,
+      isActive: true,
+    },
+    include: {
+      user: true,
+    },
+    orderBy: {
+      lastJoinedDate: "desc",
     },
   });
 }
 
 async function createRoom(user: User) {
-  return await db.room.create({
+  const authorizedUser = await db.usersAuthorizedRoom.create({
     data: {
-      shareId: generateRoomId(),
-      createdAt: new Date(),
-      owner: {
+      room: {
+        create: {
+          shareId: generateRoomId(),
+          createdAt: new Date(),
+          owner: {
+            connect: { id: user.id },
+          },
+        },
+      },
+      user: {
         connect: { id: user.id },
       },
     },
+    include: {
+      room: {
+        include: {
+          joinList: {
+            include: {
+              user: true,
+            },
+          },
+          messages: true,
+          authorizedUsers: {
+            include: {
+              user: true,
+            },
+          },
+        },
+      },
+    },
   });
+
+  return authorizedUser.room;
 }
 
-async function updateRoom(user: User, roomId: string, name: string) {
-  return await db.room.update({
+async function updateRoom(
+  user: User,
+  roomId: string,
+  name: string,
+  isPublic: boolean,
+) {
+  const room = await db.room.update({
     where: {
       ownerId: user.id,
       id: roomId,
     },
     data: {
-      name: name,
+      name,
+      isPublic,
     },
   });
+
+  if (!room.isPublic) {
+    await db.usersAuthorizedRoom.create({
+      data: {
+        room: {
+          connect: { id: room.id },
+        },
+        user: {
+          connect: { id: user.id },
+        },
+      },
+    });
+  }
 }
 
 async function updateRoomShareId(user: User, roomId: string) {
-  return await db.room.update({
+  const newShareId = generateRoomId();
+  await db.room.update({
     where: {
       ownerId: user.id,
       id: roomId,
     },
     data: {
-      shareId: generateRoomId(),
+      shareId: newShareId,
     },
   });
+
+  return newShareId;
 }
 
 async function deleteRoom(user: User, roomId: string) {
@@ -131,15 +242,42 @@ async function deleteRoom(user: User, roomId: string) {
 async function sendUserMessage(
   user: User,
   roomId: string,
-  messageText: string
+  messageText: string,
 ) {
   return await db.message.create({
     data: {
       text: messageText,
-      sentAt: new Date(),
       sender: {
         connect: { id: user.id },
       },
+      room: {
+        connect: { id: roomId },
+      },
+    },
+    include: {
+      sender: true,
+    },
+  });
+}
+
+async function sendUserJoinMessage(user: User, roomId: string) {
+  return await db.message.create({
+    data: {
+      text: `${user.name} joined the room`,
+      room: {
+        connect: { id: roomId },
+      },
+    },
+    include: {
+      sender: true,
+    },
+  });
+}
+
+async function sendUserLeaveMessage(user: User, roomId: string) {
+  return await db.message.create({
+    data: {
+      text: `${user.name} left the room`,
       room: {
         connect: { id: roomId },
       },
@@ -175,21 +313,48 @@ async function addUserToRoom(user: User, roomId: string) {
 }
 
 async function removeUserFromRoom(user: User, roomId: string) {
-  return await db.usersJoinedRoom.update({
+  console.log("Attempting to remove user from room", roomId);
+  console.log(user);
+  console.log(roomId);
+  return await db.usersJoinedRoom.upsert({
     where: {
       userId_roomId: {
         userId: user.id,
         roomId,
       },
     },
-    data: {
+    create: {
+      isActive: false,
+      user: {
+        connect: { id: user.id },
+      },
+      room: {
+        connect: { id: roomId },
+      },
+    },
+    update: {
       isActive: false,
       lastJoinedDate: new Date(),
     },
   });
 }
 
+async function isUserActiveInRoom(user: User, roomId: string) {
+  const userJoinedRoom = await db.usersJoinedRoom.findUnique({
+    where: {
+      userId_roomId: {
+        userId: user.id,
+        roomId,
+      },
+    },
+  });
+  console.log(userJoinedRoom);
+  console.log("User is active already?", userJoinedRoom?.isActive);
+  return userJoinedRoom?.isActive;
+}
+
 export default {
+  getRoomById,
   joinRoomByShareId,
   getRoomByShareId,
   getRoomsByUser,
@@ -198,6 +363,10 @@ export default {
   updateRoomShareId,
   deleteRoom,
   sendUserMessage,
+  sendUserJoinMessage,
+  sendUserLeaveMessage,
   addUserToRoom,
   removeUserFromRoom,
+  isUserActiveInRoom,
+  getActiveUsersInRoom,
 };

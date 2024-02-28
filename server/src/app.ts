@@ -1,14 +1,14 @@
-import express, { NextFunction } from "express";
+import express, { Request, Response, NextFunction } from "express";
 import http, { IncomingMessage } from "http";
 import { Server, Socket } from "socket.io";
 import cors from "cors";
 import session, { SessionData } from "express-session";
-import { SocketData } from "./types";
 import routes from "./routes/index";
-import { onConnection } from "./routes/room/socket";
+import { onConnection } from "./routes/socket";
 import { db } from "./db";
 import { User } from "@prisma/client";
 import { requireAuth } from "./middleware";
+import errorhandler from "errorhandler";
 
 const PORT = 3000;
 const app = express();
@@ -46,7 +46,7 @@ const corsOptions = {
 };
 
 // Configure Socket-IO
-const io = new Server<SocketData>(server, {
+const io = new Server(server, {
   cors: corsOptions,
 });
 
@@ -57,17 +57,24 @@ app.use(express.json());
 app.use(cors(corsOptions));
 app.use(sessionMiddleware);
 app.use(routes);
+app.use(errorhandler());
 
 const wrapper = (middleware: any) => (socket: Socket, next: any) =>
   middleware(socket.request, {}, next);
 
 io.use(wrapper(sessionMiddleware));
 io.use(wrapper(requireAuth));
-// io.engine.use(requireAuth);
 io.on("connection", (socket: Socket) => onConnection(io, socket));
 
-app.get("/", (req: express.Request, res: express.Response) => {
+app.get("/", (_, res: express.Response) => {
   res.json({ status: "API is running on /api" });
+});
+
+app.use((err: Error, req: Request, res: Response, next: NextFunction) => {
+  if (err) {
+    return res.status(500).json({ error: "Internal Server Error" });
+  }
+  next();
 });
 
 server.listen(PORT, () => {
