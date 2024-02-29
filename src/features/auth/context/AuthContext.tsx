@@ -9,7 +9,7 @@ type AuthProviderProps = {
 };
 type AuthContext = {
   isAuthenticated: boolean;
-  currentUser: User;
+  currentUser?: User;
   logout: () => void;
 };
 

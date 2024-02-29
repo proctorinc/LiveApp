@@ -1,4 +1,4 @@
-import Axios, { InternalAxiosRequestConfig } from "axios";
+import Axios, { type InternalAxiosRequestConfig } from "axios";
 import { API_URL } from "../config";
 
 const authRequestInterceptor = (config: InternalAxiosRequestConfig) => {

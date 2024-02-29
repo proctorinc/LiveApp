@@ -3,15 +3,15 @@ import useRoom from "@/features/room/hooks/useRoom";
 import { FormEvent, useEffect, useState } from "react";
 import { copyToClipboard, formatTimeSince } from "../utils";
 import Navbar from "@/components/Navbar";
-import useAuth from "../features/auth/hooks/useAuth";
 import { Copy, DoorOpen, PaperPlaneRight } from "@phosphor-icons/react";
 import UserProfileImage from "@/features/user/components/UserProfileImage";
+import useUser from "@/features/user/hooks/useUser";
 
 const Room = () => {
   const { roomId } = useParams();
   const { isRoomLoaded, loadRoom, leaveRoom, sendMessage, room, alertQueue } =
     useRoom();
-  const { currentUser } = useAuth();
+  const currentUser = useUser();
   const [message, setMessage] = useState("");
 
   const submitForm = (event: FormEvent<HTMLFormElement>) => {

@@ -3,9 +3,9 @@ import { FC, FormEvent, useState } from "react";
 
 import UserProfileImage from "./UserProfileImage";
 import { formatDate } from "@/utils";
-import useAuth from "@/features/auth/hooks/useAuth";
 import Modal from "@/components/Modal";
 import { useUpdateUserMutation } from "../hooks/useUpdateUserMutation";
+import useUser from "../hooks/useUser";
 
 type UserProfileModalProps = {
   isOpen: boolean;
@@ -13,7 +13,7 @@ type UserProfileModalProps = {
 };
 
 const UserProfileModal: FC<UserProfileModalProps> = ({ isOpen, onClose }) => {
-  const { currentUser } = useAuth();
+  const currentUser = useUser();
   const [name, setName] = useState(currentUser.name ?? "");
   const [color, setColor] = useState(currentUser.color ?? "blue");
 

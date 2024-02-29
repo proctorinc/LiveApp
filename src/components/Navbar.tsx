@@ -5,10 +5,12 @@ import { Chats, Pencil, SignOut } from "@phosphor-icons/react";
 import { useState } from "react";
 import UserProfileModal from "@/features/user/components/UserProfileModal";
 import UserProfileImage from "@/features/user/components/UserProfileImage";
+import useUser from "@/features/user/hooks/useUser";
 
 const Navbar = () => {
   const navigate = useNavigate();
-  const { currentUser, logout } = useAuth();
+  const { logout } = useAuth();
+  const currentUser = useUser();
   const [isEditing, setIsEditing] = useState(false);
 
   return (

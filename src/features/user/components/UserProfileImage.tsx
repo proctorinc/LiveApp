@@ -1,7 +1,7 @@
 import { FC, HTMLAttributes } from "react";
 import { shortenUsername } from "@/utils";
 import { User } from "@/types";
-import useAuth from "@/features/auth/hooks/useAuth";
+import useUser from "../hooks/useUser";
 
 type ProfileImageProps = HTMLAttributes<HTMLDivElement> & {
   user: User | null;
@@ -16,7 +16,7 @@ const UserProfileImage: FC<ProfileImageProps> = ({
   className,
   ...otherProps
 }) => {
-  const { currentUser } = useAuth();
+  const currentUser = useUser();
   const profileColor = color ?? user?.color ?? "blue";
   var colorStyle = "border-pink-400 from-pink-400 to-pink-200 text-pink-600";
 
@@ -54,9 +54,7 @@ const UserProfileImage: FC<ProfileImageProps> = ({
 
       {!noTooltip && (
         <div className="absolute right-1/2 top-10 z-50 w-fit translate-x-1/2 flex-col overflow-clip rounded-xl border border-gray-300 bg-white px-2 py-1 text-xs text-black opacity-0 shadow-2xl transition-opacity duration-300 group-hover:opacity-100">
-          <h2>
-            {currentUser && currentUser.name === user.name ? "You" : user.name}
-          </h2>
+          <h2>{currentUser.name === user.name ? "You" : user.name}</h2>
         </div>
       )}
     </div>
